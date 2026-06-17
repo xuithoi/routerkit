@@ -1,0 +1,39 @@
+{
+  "name": "routerkit",
+  "version": "1.0.0",
+  "description": "RouterKit — AI Proxy Gateway SDK. OAuth multi-provider login, RTK token compression, format translation, multi-account routing, request logging, and a premium embedded dashboard.",
+  "main": "src/index.js",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./proxy": "./src/services/proxy.js"
+  },
+  "bin": {
+    "routerkit": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "dev": "node bin/cli.js --port 20128",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "routerkit",
+    "ai-proxy",
+    "oauth",
+    "sso",
+    "claude",
+    "gemini",
+    "codex",
+    "kiro",
+    "github-copilot",
+    "rtk",
+    "token-saver",
+    "analytics",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "open": "^10.1.0"
+  }
+}

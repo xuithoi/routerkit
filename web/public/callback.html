@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RouterKit — Authentication</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #080a0f;
+      color: #f1f5f9;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      background: #131720;
+      border: 1px solid rgba(148,163,184,.12);
+      border-radius: 16px;
+      padding: 40px 36px;
+      text-align: center;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    p { font-size: 13.5px; color: #94a3b8; line-height: 1.7; }
+    .bar {
+      height: 3px;
+      background: linear-gradient(90deg, #7c3aed, #3b82f6);
+      border-radius: 2px;
+      margin: 20px auto 0;
+      width: 60px;
+    }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="icon" id="icon">⏳</div>
+    <h1 id="title">Processing...</h1>
+    <p id="message">Please wait while authentication completes.</p>
+    <div class="bar"></div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code   = params.get('code');
+    const state  = params.get('state');
+    const error  = params.get('error');
+    const errDesc = params.get('error_description');
+
+    function setUI(icon, title, msg, isError) {
+      document.getElementById('icon').textContent = icon;
+      document.getElementById('title').textContent = title;
+      const msgEl = document.getElementById('message');
+      msgEl.textContent = msg;
+      if (isError) msgEl.classList.add('error');
+    }
+
+    if (error) {
+      setUI('❌', 'Authentication Failed', errDesc || error, true);
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'rk_oauth', error, error_description: errDesc }, window.location.origin);
+        setTimeout(() => window.close(), 3000);
+      }
+    } else if (code) {
+      setUI('✅', 'Authentication Successful', 'You can close this window. Completing sign-in…', false);
+      if (window.opener && !window.opener.closed) {
+        // Send code back to parent window via postMessage
+        window.opener.postMessage({ type: 'rk_oauth', code, state }, window.location.origin);
+        setTimeout(() => window.close(), 1500);
+      } else {
+        // Fallback: was a full redirect (no popup), store and go back to app
+        try {
+          sessionStorage.setItem('rk_oauth_code', code);
+          sessionStorage.setItem('rk_oauth_state', state || '');
+        } catch(e) {}
+        setTimeout(() => { window.location.href = '/'; }, 800);
+      }
+    } else {
+      setUI('⚠️', 'No Code Received', 'The authentication did not return an authorization code.', true);
+    }
+  </script>
+</body>
+</html>
