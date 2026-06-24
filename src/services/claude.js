@@ -1,4 +1,4 @@
-import { OAuthService } from "./oauth.js";
+import { OAuthService, tokenExchangeErrorMessage } from "./oauth.js";
 import { CLAUDE_CONFIG } from "../constants.js";
 
 export class ClaudeService extends OAuthService {
@@ -46,8 +46,7 @@ export class ClaudeService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Claude token exchange failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Claude", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();
@@ -96,8 +95,7 @@ export class ClaudeService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Claude token refresh failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Claude", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();

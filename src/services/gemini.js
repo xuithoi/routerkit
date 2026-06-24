@@ -1,4 +1,4 @@
-import { OAuthService } from "./oauth.js";
+import { OAuthService, tokenExchangeErrorMessage } from "./oauth.js";
 import { GEMINI_CONFIG } from "../constants.js";
 
 export class GeminiService extends OAuthService {
@@ -36,8 +36,7 @@ export class GeminiService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Gemini token exchange failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Gemini", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();
@@ -131,8 +130,7 @@ export class GeminiService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Gemini token refresh failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Gemini", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();
