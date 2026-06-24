@@ -14,7 +14,8 @@
   "scripts": {
     "start": "node bin/cli.js",
     "dev": "node bin/cli.js --port 20128",
-    "test": "node test.js"
+    "test": "node test.js",
+    "test:unit": "node --test test/*.test.js"
   },
   "keywords": [
     "routerkit",

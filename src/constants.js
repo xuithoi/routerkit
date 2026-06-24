@@ -20,16 +20,18 @@ export const CLAUDE_CONFIG = {
 };
 
 export const CODEX_CONFIG = {
-  clientId: "859fb0a2-282e-407f-8e2b-f73c51ef62ec",
-  authorizeUrl: "https://auth0.openai.com/authorize",
-  tokenUrl: "https://auth0.openai.com/oauth/token",
+  clientId: process.env.ROUTERKIT_OPENAI_CLIENT_ID || "app_EMoamEEZ73f0CkXaXp7hrann",
+  authorizeUrl: "https://auth.openai.com/oauth/authorize",
+  tokenUrl: "https://auth.openai.com/oauth/token",
   scope: "openid profile email offline_access",
   fixedPort: 1455,
   callbackPath: "/auth/callback",
   codeChallengeMethod: "S256",
   extraParams: {
-    audience: "https://api.openai.com/v1",
     prompt: "login",
+    id_token_add_organizations: "true",
+    codex_cli_simplified_flow: "true",
+    originator: "routerkit",
   },
 };
 

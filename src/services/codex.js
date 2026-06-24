@@ -1,4 +1,4 @@
-import { OAuthService } from "./oauth.js";
+import { OAuthService, tokenExchangeErrorMessage } from "./oauth.js";
 import { CODEX_CONFIG } from "../constants.js";
 import { extractCodexAccountInfo } from "../helpers.js";
 
@@ -41,8 +41,7 @@ export class CodexService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Codex token exchange failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Codex", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();
@@ -92,8 +91,7 @@ export class CodexService extends OAuthService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Codex token refresh failed: ${error}`);
+      throw new Error(await tokenExchangeErrorMessage("Codex", this.config.tokenUrl, response));
     }
 
     const tokens = await response.json();
