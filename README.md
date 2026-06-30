@@ -72,30 +72,64 @@ RouterKit will:
 ## SDK Usage (embed in your own project)
 
 ```js
-import { RouterProxy } from './src/services/proxy.js';
-import { ClaudeService } from './src/services/claude.js';
-import { upsertConnection } from './src/services/db.js';
+import {
+  createEmbeddedGateway,
+  GeminiService,
+  upsertConnection,
+  inspectEmbeddedGateway,
+} from 'routerkit';
 
-// 1. Login with Claude OAuth
-const claude = new ClaudeService();
-const { token, profile } = await claude.login();
-upsertConnection('claude', profile, token);
+// 1. Login with Gemini OAuth / Google Code Assist.
+const gemini = new GeminiService();
+const tokens = await gemini.connect();
+upsertConnection('gemini', {
+  email: tokens.email,
+  displayName: tokens.email || 'Gemini Account',
+}, tokens);
 
-// 2. Start the proxy
-new RouterProxy({ port: 20128, rtk: true }).start();
+// 2. Start an embedded gateway inside your app.
+const gateway = createEmbeddedGateway({
+  host: '127.0.0.1',
+  port: 20128,
+  publicBaseUrl: process.env.ROUTERKIT_PUBLIC_BASE_URL,
+  rtk: true,
+}).start();
+
+// 3. Inspect provider readiness from your app settings screen.
+console.log(inspectEmbeddedGateway({ port: 20128 }));
 ```
+
+---
+
+## Embedded Gateway Modules
+
+RouterKit can be embedded as an app-owned AI gateway instead of a separate CLI:
+
+- `routerkit/gateway` creates a configurable gateway with `host`, `port`, and `publicBaseUrl`.
+- `routerkit/gemini-code-assist` exposes the Gemini Code Assist adapter used by the proxy.
+- `GET /api/gateway/status` returns provider readiness, missing credentials, active host, port, and public base URL.
+
+Gemini SSO uses the Google Code Assist flow and calls:
+
+```
+https://cloudcode-pa.googleapis.com/v1internal:generateContent
+```
+
+This avoids treating a browser OAuth token as a Generative Language API key.
 
 ---
 
 ## CLI Options
 
 ```
-node bin/cli.js [--port <port>] [--no-rtk]
+node bin/cli.js [--port <port>] [--host <host>] [--public-base-url <url>] [--no-rtk]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--port` | 20128 | Port to listen on |
+| `--host` | 127.0.0.1 | Host/interface to bind. Use 0.0.0.0 only when you intend to expose the gateway |
+| `--public-base-url` | auto local URL | External URL shown to clients when the gateway is behind a tunnel, reverse proxy, or desktop shell |
 | `--no-rtk` | off | Disable RTK compression |
 
 ---
@@ -106,7 +140,7 @@ node bin/cli.js [--port <port>] [--no-rtk]
 |---|---|---|
 | **Claude** (Anthropic) | OAuth PKCE | Anthropic Messages API |
 | **Codex / ChatGPT** (OpenAI) | OAuth PKCE (port 1455) | OpenAI Chat API |
-| **Gemini** (Google) | OAuth PKCE | Gemini generateContent API |
+| **Gemini** (Google) | OAuth PKCE | Gemini Code Assist generateContent |
 | **Kiro AI** (AWS) | AWS SSO / OIDC Device Code | CodeWhisperer API |
 | **GitHub Copilot** | Device Flow | Copilot Chat API |
 

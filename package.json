@@ -6,7 +6,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./proxy": "./src/services/proxy.js"
+    "./proxy": "./src/services/proxy.js",
+    "./gateway": "./src/services/gateway.js",
+    "./gemini-code-assist": "./src/services/gemini-code-assist.js"
   },
   "bin": {
     "routerkit": "./bin/cli.js"

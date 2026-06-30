@@ -32,6 +32,11 @@ import { CodexService } from "./codex.js";
 import { GeminiService } from "./gemini.js";
 import { KiroService } from "./kiro.js";
 import { GithubService } from "./github.js";
+import {
+  buildGeminiCodeAssistRequestOptions,
+  geminiCodeAssistResponseToOpenAI,
+} from "./gemini-code-assist.js";
+import { getGatewayStatus } from "./capabilities.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_DIR = join(__dirname, "..", "dashboard");
@@ -53,8 +58,8 @@ const PROVIDER_ENDPOINTS = {
     path: "/v1/chat/completions",
   },
   gemini: {
-    host: "generativelanguage.googleapis.com",
-    path: "/v1beta/models/{model}:generateContent",
+    host: "cloudcode-pa.googleapis.com",
+    path: "/v1internal:generateContent",
   },
   github: {
     host: "api.githubcopilot.com",
@@ -104,11 +109,12 @@ async function refreshClaudeToken(conn) {
 
 async function refreshGeminiToken(conn) {
   const { tokens } = conn;
-  if (!tokens?.refresh_token) return null;
+  const refreshToken = tokens?.refreshToken || tokens?.refresh_token;
+  if (!refreshToken) return null;
 
   const body = new URLSearchParams({
     grant_type: "refresh_token",
-    refresh_token: tokens.refresh_token,
+    refresh_token: refreshToken,
     client_id: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
     client_secret: "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",
   }).toString();
@@ -129,7 +135,14 @@ async function refreshGeminiToken(conn) {
         res.on("data", (c) => (data += c));
         res.on("end", () => {
           try {
-            resolve(JSON.parse(data));
+            const parsed = JSON.parse(data);
+            if (parsed.access_token) {
+              parsed.accessToken = parsed.access_token;
+              parsed.refreshToken = parsed.refresh_token || refreshToken;
+              parsed.refresh_token = parsed.refresh_token || refreshToken;
+              parsed.expiresIn = parsed.expires_in;
+            }
+            resolve(parsed);
           } catch {
             resolve(null);
           }
@@ -147,7 +160,7 @@ async function tryRefreshToken(conn) {
   if (conn.provider === "claude") newTokens = await refreshClaudeToken(conn);
   else if (conn.provider === "gemini" || conn.provider === "antigravity") newTokens = await refreshGeminiToken(conn);
 
-  if (newTokens?.access_token) {
+  if (newTokens?.access_token || newTokens?.accessToken) {
     updateConnectionTokens(conn.id, newTokens);
     return { ...conn.tokens, ...newTokens };
   }
@@ -163,15 +176,14 @@ function buildProviderRequest(conn, requestBody) {
   const ep = PROVIDER_ENDPOINTS[provider];
   if (!ep) throw new Error(`Unsupported provider: ${provider}`);
 
-  const accessToken = tokens?.access_token || tokens?.token || tokens?.copilot_token;
+  if (provider === "gemini") {
+    return buildGeminiCodeAssistRequestOptions(conn, requestBody);
+  }
+
+  const accessToken = tokens?.accessToken || tokens?.access_token || tokens?.token || tokens?.copilot_token;
   const translatedBody = translateRequest(requestBody, "openai", provider);
 
   let path = ep.path;
-  if (provider === "gemini") {
-    const model = requestBody.model || "gemini-1.5-pro";
-    path = path.replace("{model}", model);
-    path += `?key=${tokens?.api_key || ""}`;
-  }
 
   const headers = {
     "Content-Type": "application/json",
@@ -181,8 +193,6 @@ function buildProviderRequest(conn, requestBody) {
   if (provider === "claude") {
     headers["anthropic-version"] = ep.version;
     headers["Authorization"] = `Bearer ${accessToken}`;
-  } else if (provider === "gemini") {
-    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
   } else {
     headers["Authorization"] = `Bearer ${accessToken}`;
   }
@@ -275,7 +285,10 @@ function serveStatic(res, filePath, contentType) {
 
 export class RouterProxy {
   constructor(options = {}) {
-    this.port = options.port || 20128;
+    this.port = options.port === undefined || options.port === null ? 20128 : Number(options.port);
+    this.host = options.host || process.env.ROUTERKIT_HOST || "127.0.0.1";
+    this.publicBaseUrl = options.publicBaseUrl || process.env.ROUTERKIT_PUBLIC_BASE_URL || null;
+    this.baseUrl = this.publicBaseUrl || `http://${this.host === "0.0.0.0" ? "localhost" : this.host}:${this.port}`;
     this.rtkEnabled = options.rtk !== false;
     this.server = null;
     this._roundRobinIndex = 0;
@@ -355,7 +368,9 @@ export class RouterProxy {
     }
 
     // Translate response to OpenAI format
-    const openAIResponse = translateResponse(result.body, conn.provider);
+    const openAIResponse = conn.provider === "gemini"
+      ? geminiCodeAssistResponseToOpenAI(result.body, providerOpts.model || requestBody.model)
+      : translateResponse(result.body, conn.provider);
     const latencyMs = Date.now() - startTime;
     const tokensIn = openAIResponse.usage?.prompt_tokens || originalTokens;
     const tokensOut = openAIResponse.usage?.completion_tokens || 0;
@@ -410,6 +425,15 @@ export class RouterProxy {
     // GET /api/settings
     if (path === "/api/settings" && method === "GET") {
       return jsonResponse(res, 200, getSettings());
+    }
+
+    // GET /api/gateway/status
+    if (path === "/api/gateway/status" && method === "GET") {
+      return jsonResponse(res, 200, getGatewayStatus({
+        host: this.host,
+        port: this.port,
+        publicBaseUrl: this.baseUrl,
+      }));
     }
 
     // POST /api/settings
@@ -503,7 +527,7 @@ export class RouterProxy {
 
   start() {
     this.server = http.createServer(async (req, res) => {
-      const url = new URL(req.url, `http://localhost:${this.port}`);
+      const url = new URL(req.url, this.baseUrl);
       const method = req.method.toUpperCase();
 
       setCORS(res);
@@ -537,12 +561,15 @@ export class RouterProxy {
       res.end("Not found");
     });
 
-    this.server.listen(this.port, "0.0.0.0", () => {
+    this.server.listen(this.port, this.host, () => {
+      const address = this.server.address();
+      if (address && typeof address === "object") this.port = address.port;
+      this.baseUrl = this.publicBaseUrl || `http://${this.host === "0.0.0.0" ? "localhost" : this.host}:${this.port}`;
       console.log(`\n┌──────────────────────────────────────────┐`);
       console.log(`│  🚀 RouterKit Proxy — Port ${this.port}          │`);
       console.log(`├──────────────────────────────────────────┤`);
-      console.log(`│  Dashboard:  http://localhost:${this.port}/       │`);
-      console.log(`│  Endpoint:   http://localhost:${this.port}/v1/chat/completions │`);
+      console.log(`│  Dashboard:  ${this.baseUrl}/       │`);
+      console.log(`│  Endpoint:   ${this.baseUrl}/v1/chat/completions │`);
       console.log(`│  RTK:        ${this.rtkEnabled ? "✅ Enabled" : "⛔ Disabled"}                    │`);
       console.log(`└──────────────────────────────────────────┘\n`);
     });
