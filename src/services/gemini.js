@@ -1,5 +1,5 @@
 import { OAuthService } from "./oauth.js";
-import { GEMINI_CONFIG } from "../constants.js";
+import { GEMINI_CONFIG, getOAuthPlatformEnum } from "../constants.js";
 
 export class GeminiService extends OAuthService {
   constructor() {
@@ -62,7 +62,7 @@ export class GeminiService extends OAuthService {
   async fetchProjectId(accessToken) {
     try {
       const response = await fetch(
-        "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+        this.config.loadCodeAssistEndpoint,
         {
           method: "POST",
           headers: {
@@ -70,7 +70,7 @@ export class GeminiService extends OAuthService {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            metadata: { ideType: 9, platform: 5, pluginType: 2 }, // Standalone defaults to Win
+            metadata: { ideType: 9, platform: getOAuthPlatformEnum(), pluginType: 2 },
             mode: 1,
           }),
         }
@@ -104,11 +104,15 @@ export class GeminiService extends OAuthService {
 
     return {
       accessToken: tokens.access_token,
+      access_token: tokens.access_token,
       refreshToken: tokens.refresh_token,
+      refresh_token: tokens.refresh_token,
       expiresIn: tokens.expires_in,
+      expires_in: tokens.expires_in,
       scope: tokens.scope,
       email: userInfo.email,
       projectId: projectId,
+      project_id: projectId,
     };
   }
 
@@ -138,8 +142,11 @@ export class GeminiService extends OAuthService {
     const tokens = await response.json();
     return {
       accessToken: tokens.access_token,
+      access_token: tokens.access_token,
       refreshToken: tokens.refresh_token || refreshToken,
+      refresh_token: tokens.refresh_token || refreshToken,
       expiresIn: tokens.expires_in,
+      expires_in: tokens.expires_in,
     };
   }
 }

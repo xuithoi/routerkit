@@ -1,6 +1,6 @@
 import { platform, arch } from "os";
 
-function getOAuthPlatformEnum() {
+export function getOAuthPlatformEnum() {
   const os = platform();
   const architecture = arch();
   if (os === "darwin") return architecture === "arm64" ? 2 : 1;
@@ -38,8 +38,17 @@ export const GEMINI_CONFIG = {
   clientSecret: "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",
   authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
   tokenUrl: "https://oauth2.googleapis.com/token",
-  scopes: ["https://www.googleapis.com/auth/cloud-platform", "openid", "email"],
-  userInfoUrl: "https://openidconnect.googleapis.com/v1/userinfo",
+  scopes: [
+    "https://www.googleapis.com/auth/cloud-platform",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+  ],
+  userInfoUrl: "https://www.googleapis.com/oauth2/v1/userinfo",
+  loadCodeAssistEndpoint: "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+  generateContentEndpoint: "https://cloudcode-pa.googleapis.com/v1internal:generateContent",
+  retrieveQuotaEndpoint: "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+  cliVersion: "0.34.0",
+  apiClient: "google-genai-sdk/1.41.0 gl-node",
 };
 
 export const KIRO_CONFIG = {
